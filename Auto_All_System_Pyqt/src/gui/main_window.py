@@ -875,8 +875,13 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "提示", "请先在列表中勾选要处理的窗口")
             return
         
+        # 获取全局并发数
+        thread_count = self.thread_spinbox.value()
+        
         msg = f"确定要对选中的 {len(selected_ids)} 个窗口执行 SheerID 提取吗？\n"
-        msg += "将依次打开浏览器、登录Google、检测学生资格并提取链接。"
+        msg += f"当前并发模式: {thread_count} 线程\n"
+        if thread_count > 1:
+            msg += "⚠️ 注意: 将同时打开多个浏览器窗口，请确保电脑资源充足。"
         
         reply = QMessageBox.question(
             self, '确认操作', msg,
@@ -886,7 +891,7 @@ class MainWindow(QMainWindow):
         if reply != QMessageBox.StandardButton.Yes:
             return
         
-        self.log(f"\n开始提取SheerLink，共 {len(selected_ids)} 个窗口...")
+        self.log(f"\n开始提取SheerLink，共 {len(selected_ids)} 个窗口，并发: {thread_count}...")
         
         # 禁用按钮
         self._stop_flag = False
@@ -895,7 +900,7 @@ class MainWindow(QMainWindow):
         # 使用工作线程避免阻塞主界面
         from gui.worker_thread import WorkerThread
         
-        self._worker = WorkerThread('sheerlink', ids=selected_ids, thread_count=1)
+        self._worker = WorkerThread('sheerlink', ids=selected_ids, thread_count=thread_count)
         self._worker.log_signal.connect(self.log)
         self._worker.finished_signal.connect(self._on_sheerlink_finished)
         self._worker.start()

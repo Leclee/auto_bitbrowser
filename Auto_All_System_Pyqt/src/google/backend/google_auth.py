@@ -224,6 +224,7 @@ async def google_login(page: Page, account_info: dict) -> Tuple[bool, str]:
     @details 支持: 账号密码登录, 2FA(TOTP), 辅助邮箱验证
              并处理登录后的安全提醒弹窗
     """
+    import time
     email = account_info.get('email', '')
     print(f"[GoogleLogin] 开始登录流程: {email}")
     
@@ -232,104 +233,158 @@ async def google_login(page: Page, account_info: dict) -> Tuple[bool, str]:
     if status == GoogleLoginStatus.LOGGED_IN:
         logged_email = info.get('email', '')
         if logged_email and logged_email.lower() == email.lower():
+            print(f"[GoogleLogin] ✅ 已登录正确账号")
             return True, "已登录（正确账号）"
         elif logged_email:
             print(f"[GoogleLogin] 当前登录账号 {logged_email} 与目标账号 {email} 不符")
     
     # 1. 导航到登录页
+    print("[GoogleLogin] 步骤1: 导航到登录页...")
     try:
         current_url = page.url
         if "accounts.google.com" not in current_url:
             await page.goto('https://accounts.google.com', timeout=60000)
             await asyncio.sleep(2)
     except Exception as e:
-        print(f"[GoogleLogin] 导航失败: {e}")
+        print(f"[GoogleLogin] ❌ 导航失败: {e}")
+        return False, f"导航失败: {e}"
     
-    # 2. 输入邮箱
-    try:
-        email_input = page.locator('input[type="email"]')
-        if await email_input.count() > 0 and await email_input.is_visible():
-            print(f"[GoogleLogin] 输入邮箱: {email}")
-            await email_input.fill(email)
-            await page.click('#identifierNext >> button')
-            await asyncio.sleep(3)
-    except Exception as e:
-        print(f"[GoogleLogin] 邮箱输入异常: {e}")
+    # 2. 等待并输入邮箱
+    print("[GoogleLogin] 步骤2: 等待邮箱输入框...")
+    email_timeout = 10
+    start_time = time.time()
+    email_input = None
     
-    # 3. 输入密码
-    try:
-        password_input = page.locator('input[type="password"]')
-        if await password_input.count() > 0 and await password_input.is_visible():
-            password = account_info.get('password', '')
-            if password:
-                print("[GoogleLogin] 输入密码...")
+    while time.time() - start_time < email_timeout:
+        try:
+            email_input = page.locator('input[type="email"]')
+            if await email_input.count() > 0 and await email_input.is_visible():
+                print(f"[GoogleLogin] 步骤2: 输入邮箱 {email}")
+                await email_input.fill(email)
+                await page.click('#identifierNext >> button')
+                break
+        except:
+            pass
+        await asyncio.sleep(0.5)
+    else:
+        print("[GoogleLogin] ❌ 超时: 邮箱输入框未出现")
+        return False, "超时: 邮箱输入框未出现"
+    
+    # 3. 等待并输入密码
+    print("[GoogleLogin] 步骤3: 等待密码输入框...")
+    password_timeout = 10
+    start_time = time.time()
+    password_entered = False
+    
+    while time.time() - start_time < password_timeout:
+        try:
+            password_input = page.locator('input[type="password"]')
+            if await password_input.count() > 0 and await password_input.is_visible():
+                password = account_info.get('password', '')
+                if not password:
+                    print("[GoogleLogin] ❌ 未提供密码")
+                    return False, "未提供密码"
+                
+                print("[GoogleLogin] 步骤3: 输入密码...")
                 await password_input.fill(password)
                 await page.click('#passwordNext >> button')
-                await asyncio.sleep(5)
-            else:
-                return False, "未提供密码"
-    except Exception as e:
-        print(f"[GoogleLogin] 密码输入异常: {e}")
+                password_entered = True
+                break
+        except:
+            pass
+        await asyncio.sleep(0.5)
     
-    # 4. 处理验证步骤 (循环检测) - 直接检测页面元素而非依赖状态函数
-    max_checks = 5
-    for i in range(max_checks):
-        print(f"[GoogleLogin] 检查验证步骤 ({i+1}/{max_checks})...")
-        
+    if not password_entered:
+        print("[GoogleLogin] ❌ 超时: 密码输入框未出现")
+        return False, "超时: 密码输入框未出现"
+    
+    # 等待密码验证
+    print("[GoogleLogin] 步骤4: 等待密码验证...")
+    await asyncio.sleep(3)
+    
+    # 5. 处理验证步骤循环
+    max_attempts = 10
+    for attempt in range(max_attempts):
         # 检查是否已登录
         current_url = page.url
         for pattern in LOGGED_IN_URL_PATTERNS:
             if pattern in current_url:
-                print("[GoogleLogin] 登录成功")
+                print("[GoogleLogin] ✅ 登录成功")
                 return True, "登录成功"
         
-        # A. 直接检测2FA输入框
-        totp_input = page.locator('input[name="totpPin"], input[id="totpPin"], input[type="tel"]').first
-        if await totp_input.count() > 0 and await totp_input.is_visible():
-            secret = account_info.get('secret') or account_info.get('2fa_secret') or account_info.get('secret_key')
-            if secret:
-                try:
-                    s = secret.replace(" ", "").strip()
-                    totp = pyotp.TOTP(s)
-                    code = totp.now()
-                    print(f"[GoogleLogin] 检测到2FA，输入代码: {code}")
-                    await totp_input.fill(code)
-                    await page.click('#totpNext >> button')
-                    await asyncio.sleep(3)
-                    continue
-                except Exception as e:
-                    return False, f"2FA生成失败: {e}"
-            else:
-                return False, "需要2FA但未提供密钥"
-        
-        # B. 处理"Confirm your recovery email"选择页面
-        recovery_option = page.locator('div[role="link"]:has-text("Confirm your recovery email")').first
-        if await recovery_option.count() > 0 and await recovery_option.is_visible():
-            print("[GoogleLogin] 点击 'Confirm your recovery email' 选项")
-            await recovery_option.click(force=True)
-            await asyncio.sleep(3)
-            continue
-        
-        # C. 直接检测辅助邮箱输入框
-        recovery_input = page.locator('input[name="knowledgePreregisteredEmailResponse"], input[id="knowledge-preregistered-email-response"]').first
-        if await recovery_input.count() > 0 and await recovery_input.is_visible():
-            backup_email = account_info.get('backup') or account_info.get('backup_email') or account_info.get('recovery_email')
-            if backup_email:
-                print(f"[GoogleLogin] 输入辅助邮箱: {backup_email}")
-                await recovery_input.fill(backup_email)
-                next_btn = page.locator('button:has-text("Next"), button:has-text("下一步")').first
-                if await next_btn.count() > 0:
-                    await next_btn.click()
+        # A. 检测2FA输入框
+        try:
+            totp_input = page.locator('input[name="totpPin"], input[id="totpPin"], input[type="tel"]').first
+            if await totp_input.count() > 0 and await totp_input.is_visible():
+                print("[GoogleLogin] 步骤5-2FA: 检测到2FA验证码输入框")
+                secret = account_info.get('secret') or account_info.get('2fa_secret') or account_info.get('secret_key')
+                if secret:
+                    try:
+                        s = secret.replace(" ", "").strip()
+                        totp = pyotp.TOTP(s)
+                        code = totp.now()
+                        print(f"[GoogleLogin] 步骤5-2FA: 输入验证码 {code}")
+                        await totp_input.fill(code)
+                        await page.click('#totpNext >> button')
+                        await asyncio.sleep(3)
+                        continue
+                    except Exception as e:
+                        print(f"[GoogleLogin] ❌ 2FA生成失败: {e}")
+                        return False, f"2FA生成失败: {e}"
                 else:
-                    await page.keyboard.press('Enter')
+                    print("[GoogleLogin] ❌ 需要2FA但未提供密钥")
+                    return False, "需要2FA但未提供密钥"
+        except:
+            pass
+        
+        # B. 检测"Confirm your recovery email"选择页面
+        try:
+            recovery_option = page.locator('div[role="link"]:has-text("Confirm your recovery email")').first
+            if await recovery_option.count() > 0 and await recovery_option.is_visible():
+                print("[GoogleLogin] 步骤5-选择: 点击'确认辅助邮箱'选项")
+                await recovery_option.click(force=True)
                 await asyncio.sleep(3)
                 continue
-            else:
-                return False, "需要辅助邮箱但未提供"
+        except:
+            pass
         
+        # C. 检测辅助邮箱输入框
+        try:
+            recovery_input = page.locator('input[name="knowledgePreregisteredEmailResponse"], input[id="knowledge-preregistered-email-response"]').first
+            if await recovery_input.count() > 0 and await recovery_input.is_visible():
+                print("[GoogleLogin] 步骤5-辅助邮箱: 检测到辅助邮箱输入框")
+                backup_email = account_info.get('backup') or account_info.get('backup_email') or account_info.get('recovery_email')
+                if backup_email:
+                    print(f"[GoogleLogin] 步骤5-辅助邮箱: 输入 {backup_email}")
+                    await recovery_input.fill(backup_email)
+                    next_btn = page.locator('button:has-text("Next"), button:has-text("下一步")').first
+                    if await next_btn.count() > 0:
+                        await next_btn.click()
+                    else:
+                        await page.keyboard.press('Enter')
+                    await asyncio.sleep(3)
+                    continue
+                else:
+                    print("[GoogleLogin] ❌ 需要辅助邮箱但未提供")
+                    return False, "需要辅助邮箱但未提供"
+        except:
+            pass
+        
+        # D. 检测密码错误提示
+        try:
+            error_texts = ['Wrong password', '密码错误', 'Couldn\'t sign you in', '无法登录']
+            for err in error_texts:
+                if await page.locator(f'text="{err}"').count() > 0:
+                    print(f"[GoogleLogin] ❌ 密码错误或登录失败")
+                    return False, "密码错误或登录失败"
+        except:
+            pass
+        
+        # 等待并继续检测
         await asyncio.sleep(2)
     
-    # 5. 处理登录后的安全弹窗
+    # 6. 处理登录后的安全弹窗
+    print("[GoogleLogin] 步骤6: 检查安全弹窗...")
     try:
         dismiss_buttons = [
             'button:has-text("Not now")',
@@ -341,7 +396,7 @@ async def google_login(page: Page, account_info: dict) -> Tuple[bool, str]:
         for selector in dismiss_buttons:
             btn = page.locator(selector).first
             if await btn.count() > 0 and await btn.is_visible():
-                print(f"[GoogleLogin] 关闭安全弹窗...")
+                print("[GoogleLogin] 步骤6: 关闭安全弹窗")
                 await btn.click()
                 await asyncio.sleep(1)
                 break
@@ -349,11 +404,14 @@ async def google_login(page: Page, account_info: dict) -> Tuple[bool, str]:
         pass
     
     # 最终检查
+    print("[GoogleLogin] 步骤7: 最终登录状态检查...")
     final_status, _ = await check_google_login_status(page)
     if final_status == GoogleLoginStatus.LOGGED_IN:
+        print("[GoogleLogin] ✅ 登录成功")
         return True, "登录成功"
     
-    return False, f"登录流程结束，最终状态: {final_status}"
+    print(f"[GoogleLogin] ❌ 登录失败，最终状态: {final_status}")
+    return False, f"登录失败，最终状态: {final_status}"
 
 
 # ==================== Google One状态检测 ====================
