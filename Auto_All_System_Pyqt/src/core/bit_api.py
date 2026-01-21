@@ -913,3 +913,48 @@ if __name__ == "__main__":
         for browser in browsers[:3]:
             print(f"  - {browser.get('name')} (ID: {browser.get('id')})")
 
+
+# ==================== 便捷函数 ====================
+# 全局API实例
+_api = BitBrowserAPI()
+
+
+def open_browser(browser_id: str, **kwargs) -> dict:
+    """
+    @brief 打开浏览器窗口
+    @param browser_id 窗口ID
+    @return API响应
+    """
+    return _api.open_browser(browser_id, **kwargs)
+
+
+def close_browser(browser_id: str) -> dict:
+    """
+    @brief 关闭浏览器窗口
+    @param browser_id 窗口ID
+    @return API响应
+    """
+    return _api.close_browser(browser_id)
+
+
+def get_browser_info(browser_id: str) -> dict:
+    """
+    @brief 获取浏览器详情
+    @param browser_id 窗口ID
+    @return 浏览器信息
+    """
+    result = _api.get_browser_detail(browser_id)
+    if result.get('success'):
+        return result.get('data', {})
+    return {}
+
+
+def delete_browser(browser_id: str) -> dict:
+    """
+    @brief 删除浏览器窗口
+    @param browser_id 窗口ID
+    @return API响应
+    """
+    return _api.delete_browser(browser_id)
+
+
