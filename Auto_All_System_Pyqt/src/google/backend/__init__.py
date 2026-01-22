@@ -11,6 +11,7 @@
 - sheerlink_service: SheerLink提取服务
 - bind_card_service: 绑卡订阅服务
 - all_in_one_service: 全自动处理服务
+- google_detector: Google检测模块V2 (API拦截+智能等待)
 """
 
 from .sheerid_verifier import SheerIDVerifier
@@ -42,6 +43,20 @@ from .bind_card_service import (
 from .all_in_one_service import (
     process_all_in_one,
 )
+from .google_detector import (
+    check_google_login_by_avatar,
+    check_google_one_status_v2,
+    full_google_detection,
+    STATUS_DISPLAY,
+    STATUS_NOT_LOGGED_IN,
+    STATUS_SUBSCRIBED_ANTIGRAVITY,
+    STATUS_SUBSCRIBED,
+    STATUS_VERIFIED,
+    STATUS_LINK_READY,
+    STATUS_INELIGIBLE,
+    STATUS_ERROR,
+    STATUS_PENDING,
+)
 
 __all__ = [
     # 已迁移模块 - 核心类
@@ -69,6 +84,12 @@ __all__ = [
     'process_bind_card',
     # 全自动服务
     'process_all_in_one',
+    # V2检测模块
+    'check_google_login_by_avatar',
+    'check_google_one_status_v2',
+    'full_google_detection',
+    'STATUS_DISPLAY',
 ]
+
 
 

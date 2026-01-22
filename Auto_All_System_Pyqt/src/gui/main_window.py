@@ -587,10 +587,12 @@ class MainWindow(QMainWindow):
             # 状态显示映射
             status_display = {
                 'pending_check': '❔待检测',
+                'not_logged_in': '🔒未登录',
                 'ineligible': '❌无资格',
                 'link_ready': '🔗待验证',
                 'verified': '✅已验证',
                 'subscribed': '👑已订阅',
+                'subscribed_antigravity': '🌟已解锁',
                 'error': '⚠️错误',
             }
             
