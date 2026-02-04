@@ -111,6 +111,7 @@ ChatGPT/Gemini/Grok 续费
 | **SheerID 验证** | ✅ | ✅ | 自动提取链接、API批量验证 |
 | **自动绑卡订阅** | ✅ | ✅ | 全自动填写信用卡并完成订阅 |
 | **一键全自动** | ✅ | ✅ | 登录→检测→验证→绑卡 全流程 |
+| **批量更改2FA** | ✅ | ✅ | 自动更换 Authenticator 密钥 |
 | **多用户权限** | ✅ | ❌ | RBAC 权限控制 |
 | **任务队列** | ✅ | ❌ | Celery 分布式任务调度 |
 | **插件系统** | ✅ | ❌ | 动态加载、热插拔 |
@@ -403,7 +404,7 @@ MIT License - 详见 [LICENSE](LICENSE)
 
 ---
 
-**Version**: 2.0.0 | **Last Updated**: 2026-01-19
+**Version**: 2.1.0 | **Last Updated**: 2026-02-03
 
 Made with ❤️ by Auto All System Team
 

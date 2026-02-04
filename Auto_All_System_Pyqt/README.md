@@ -869,7 +869,7 @@ scripts\启动项目.bat
 
 ---
 
-**Version**: 2.0.0 | **Last Updated**: 2026-01-19
+**Version**: 2.1.0 | **Last Updated**: 2026-02-03
 
 Made with ❤️ by Auto All System Team
 

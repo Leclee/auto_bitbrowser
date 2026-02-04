@@ -24,6 +24,13 @@
 **/有资格待验证号.txt
 **/超时或其他错误.txt
 
+# 导出文件（包含账号信息）
+**/accounts_export_*.txt
+**/*_export_*.txt
+
+# 临时配置文件
+**/temp_config.json
+
 # 保留示例文件供参考
 !**/accounts_example.txt
 !**/proxies_example.txt
